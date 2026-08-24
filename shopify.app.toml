@@ -1,0 +1,16 @@
+# Archivo de configuración para la app Eleventa Sync de Shopify
+# Se usa con el Shopify CLI para desplegar actualizaciones
+
+name = "Eleventa Sync"
+client_id = "dac0a982f7cc933f15a4c0f7aec0b259"
+application_url = "http://localhost:3456"
+embedded = false
+
+[auth]
+redirect_urls = ["http://localhost:3456/callback"]
+
+[access_scopes]
+scopes = "write_inventory,read_inventory,read_orders,read_products"
+
+[webhooks]
+api_version = "2026-07"

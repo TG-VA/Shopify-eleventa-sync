@@ -1,0 +1,59 @@
+# ==============================================================================
+# Shopify-Eleventa Sync — .gitignore
+# ==============================================================================
+
+# --- Entornos virtuales de Python ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Bytecode y caché de Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# --- Variables de entorno (NUNCA subir secretos) ---
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+
+# --- Bases de datos locales ---
+*.db
+*.sqlite3
+*.fdb
+
+# --- Logs ---
+logs/
+*.log
+
+# --- IDEs y editores ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+docker-compose.override.yml
+
+# --- Reportes de sincronización ---
+sync_reports/
+*_sync_report_*.json
+*_sync_report_*.csv
+
+# --- Archivos temporales ---
+tmp/
+temp/
+*.tmp
