@@ -147,7 +147,7 @@ Este script:
 ### Paso 6: Iniciar el middleware
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+uvicorn middleware.main:app --reload --port 8000
 ```
 
 El servidor estará disponible en `http://localhost:8000`.
@@ -180,6 +180,15 @@ Todas las variables se configuran en el archivo `.env`. Consulta [`.env.example`
 | `SYNC_MAX_RETRIES` | Reintentos máximos por operación | `3` |
 | `SYNC_BATCH_SIZE` | Tamaño de lote para sync masiva | `50` |
 | `SYNC_NAME_MATCH_THRESHOLD` | Umbral mínimo para match por nombre | `0.85` |
+
+### Variables del Agente Local
+
+| Variable | Descripción | Por defecto |
+|----------|-------------|-------------|
+| `SYNC_UP_INTERVAL_SECONDS` | Intervalo del worker Eleventa → Shopify | `10` |
+| `SYNC_DOWN_INTERVAL_SECONDS` | Intervalo del worker Shopify → Eleventa | `10` |
+| `SYNC_UP_BATCH_SIZE` | Ventas por POST al middleware (se factura en lotes) | `100` |
+| `AGENT_API_KEY` | API key del agente (comparada en tiempo constante) | — |
 
 ---
 
@@ -277,7 +286,7 @@ docker run -d \
 pip install -e .
 
 # Ejecutar con Uvicorn
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+uvicorn middleware.main:app --host 0.0.0.0 --port 8000 --workers 2
 ```
 
 > ⚠️ **Importante:** Para recibir webhooks de Shopify, tu middleware debe ser accesible con HTTPS. Usa un proxy reverso como Nginx o Caddy con certificado SSL.
