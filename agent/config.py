@@ -14,6 +14,7 @@ class AgentSettings(BaseSettings):
     # Conexión al Middleware
     MIDDLEWARE_URL: str = "http://localhost:8000"
     AGENT_API_KEY: str = "test-agent-key-12345"
+    AGENT_ID: str = "eleventa-agent"
 
     # Conexión a la Base de Datos de Eleventa (Firebird)
     ELEVENTA_DB_PATH: str = "C:/Program Files/Eleventa/pdv.fdb"
@@ -23,6 +24,11 @@ class AgentSettings(BaseSettings):
     # Configuración de los ciclos (workers)
     SYNC_DOWN_INTERVAL_SECONDS: int = 10
     SYNC_UP_INTERVAL_SECONDS: int = 10
+
+    # Máximo de ventas de Eleventa enviadas por POST al middleware. Acota el
+    # payload y el tiempo de respuesta cuando la tienda acumuló ventas sin
+    # internet (modo offline) y evita timeouts en lotes masivos.
+    SYNC_UP_BATCH_SIZE: int = 100
 
     model_config = SettingsConfigDict(
         env_file=str(Path(__file__).parent / ".env"),
