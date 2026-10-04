@@ -43,23 +43,39 @@ def verify_shopify_webhook(data: bytes, hmac_header: str, secret: str) -> bool:
     """
     Verifica la autenticidad de un webhook de Shopify usando HMAC-SHA256.
 
+    `data` debe ser el cuerpo CRUDO de la petición (`await request.body()`),
+    nunca el JSON ya parseado: cualquier reserialización cambia bytes y
+    rompe la firma. La comparación usa `hmac.compare_digest`, de tiempo
+    constante, para no filtrar la firma por temporización.
+
     Args:
         data: Cuerpo crudo de la petición.
         hmac_header: Valor del encabezado X-Shopify-Hmac-Sha256.
         secret: Secreto del webhook configurado en Shopify.
 
     Returns:
-        True si el HMAC es válido, False en caso contrario.
+        True si el HMAC es válido, False en caso contrario (incluye headers
+        ausentes o malformados).
     """
+    if not data or not hmac_header or not secret:
+        logger.warning("Verificación de webhook rechazada: payload o header vacío.")
+        return False
+
     computed_hmac = base64.b64encode(
         hmac.new(
             secret.encode("utf-8"),
             data,
             hashlib.sha256,
         ).digest()
-    ).decode("utf-8")
+    )
 
-    return hmac.compare_digest(computed_hmac, hmac_header)
+    try:
+        # Se comparan bytes: compare_digest lanza TypeError con caracteres no
+        # ASCII en str, y un TypeError en un header hostil no debe ser un 500.
+        return hmac.compare_digest(computed_hmac, hmac_header.encode("utf-8"))
+    except (AttributeError, TypeError) as exc:
+        logger.warning("Header HMAC malformado: %s", exc)
+        return False
 
 
 @router.post("/orders-create")
@@ -85,7 +101,8 @@ async def handle_order_create(
     if _sync_engine is None:
         raise HTTPException(status_code=503, detail="Servicio no inicializado.")
 
-    # Verificar HMAC
+    # Verificar HMAC sobre el cuerpo CRUDO: `request.body()` cachea los bytes
+    # originales, así que el `request.json()` posterior no los altera.
     body = await request.body()
     if not verify_shopify_webhook(body, x_shopify_hmac_sha256, _webhook_secret):
         logger.warning("Webhook rechazado: HMAC inválido.")
@@ -136,7 +153,8 @@ async def handle_inventory_update(
     if _sync_engine is None:
         raise HTTPException(status_code=503, detail="Servicio no inicializado.")
 
-    # Verificar HMAC
+    # Verificar HMAC sobre el cuerpo CRUDO: `request.body()` cachea los bytes
+    # originales, así que el `request.json()` posterior no los altera.
     body = await request.body()
     if not verify_shopify_webhook(body, x_shopify_hmac_sha256, _webhook_secret):
         logger.warning("Webhook rechazado: HMAC inválido.")

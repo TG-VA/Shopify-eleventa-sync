@@ -15,6 +15,7 @@ from typing import Any
 import asyncpg
 
 from shared.models import InventoryChange, PendingAdjustment
+from middleware.config import settings
 from middleware.services.shopify_client import ShopifyClient
 from middleware.services.product_mapper import ProductMapper
 
@@ -69,12 +70,18 @@ class SyncEngine:
         processed = 0
         errors: list[str] = []
 
-        # Obtener primera ubicación de Shopify
+        # Obtener ubicaciones de Shopify
         locations = await self.shopify.get_locations()
         if not locations:
             return {"processed": 0, "errors": ["No hay ubicaciones en Shopify."]}
 
-        location_id = locations[0]["id"]
+        location_id = settings.SHOPIFY_LOCATION_ID
+        if not location_id:
+            location_id = locations[0]["id"]
+            logger.warning(
+                "SHOPIFY_LOCATION_ID no definido, usando ubicación por defecto: %s",
+                location_id,
+            )
 
         for change in changes:
             try:
@@ -104,10 +111,19 @@ class SyncEngine:
                 )
 
                 # Aplicar ajuste en Shopify
-                delta = int(change.delta)
-                if delta == 0:
+                try:
+                    delta_float = float(change.delta)
+                except (TypeError, ValueError):
+                    delta_float = 0.0
+                if delta_float == 0:
                     logger.debug("Delta 0 para %s, omitiendo.", change.codigo)
                     continue
+                delta = int(round(delta_float))
+                if delta != delta_float:
+                    logger.warning(
+                        "Se ha redondeado delta fraccionario para %s: %s -> %d",
+                        change.codigo, delta_float, delta,
+                    )
 
                 await self.shopify.adjust_inventory(
                     inventory_item_id=inventory_item_gid,
@@ -140,9 +156,6 @@ class SyncEngine:
 
         return {"processed": processed, "errors": errors}
 
-    # ------------------------------------------------------------------ #
-    # Shopify → Eleventa (crear ajustes pendientes)
-    # ------------------------------------------------------------------ #
 
     async def process_shopify_order(
         self,

@@ -9,6 +9,7 @@ su aplicación en Eleventa.
 from __future__ import annotations
 
 import logging
+import secrets
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -29,6 +30,11 @@ router = APIRouter(prefix="/api/agent", tags=["agent"])
 # Referencias inyectadas desde main.py
 _sync_engine: SyncEngine | None = None
 _product_mapper: ProductMapper | None = None
+
+# Detalle único para todo fallo de autenticación: nunca se distingue entre
+# "API key inexistente", "incorrecta" o "comparación fallida" para no filtrar
+# información sobre la configuración del servicio.
+UNAUTHORIZED_DETAIL = "No autorizado."
 
 
 def configure_agent_router(
@@ -53,6 +59,11 @@ async def verify_agent_key(
     """
     Verifica la autenticidad del agente mediante su API key.
 
+    La comparación se hace con `secrets.compare_digest` (tiempo constante) en
+    lugar de `==`: esta última filtra información por temporización y permite
+    reconstruir la API key byte a byte. Se comparan bytes para que un header
+    con caracteres no ASCII provoque un 401 en vez de un `TypeError`.
+
     Args:
         x_agent_api_key: API key enviada en el encabezado.
 
@@ -60,14 +71,16 @@ async def verify_agent_key(
         La API key validada.
 
     Raises:
-        HTTPException 401: Si la API key es inválida.
+        HTTPException 401: Si la API key es inválida. El cuerpo no revela
+            detalles internos ni la clave esperada.
     """
-    if x_agent_api_key != settings.AGENT_API_KEY:
+    provided_key = x_agent_api_key.encode('utf-8')
+    expected_key = settings.AGENT_API_KEY.encode('utf-8')
+
+    if not secrets.compare_digest(provided_key, expected_key):
+        # Nunca se registra la clave recibida: solo el evento de rechazo.
         logger.warning("Intento de acceso con API key inválida.")
-        raise HTTPException(
-            status_code=401,
-            detail="API key del agente inválida.",
-        )
+        raise HTTPException(status_code=401, detail=UNAUTHORIZED_DETAIL)
     return x_agent_api_key
 
 
@@ -167,16 +180,12 @@ async def confirm_adjustment(
         "new_status": "applied" if confirmation.success else "failed",
     }
 
-
 @router.get("/product-mappings")
 async def get_product_mappings(
     _api_key: str = Depends(verify_agent_key),
 ) -> dict[str, Any]:
     """
     Devuelve todos los mapeos de productos Eleventa↔Shopify.
-
-    Returns:
-        Diccionario con el conteo total y la lista de mapeos.
     """
     if _product_mapper is None:
         raise HTTPException(status_code=503, detail="Servicio no inicializado.")

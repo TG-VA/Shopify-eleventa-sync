@@ -33,6 +33,7 @@ class Settings(BaseSettings):
 
     # --- Sincronización ---
     SYNC_COOLDOWN_SECONDS: int = 30
+    SHOPIFY_LOCATION_ID: str | None = None
 
 
 # Singleton de configuración (se crea al importar)
