@@ -410,7 +410,3 @@ El middleware maneja automáticamente los límites con reintentos y backoff expo
 MIT
 
 ---
-
-<p align="center">
-  Desarrollado con ❤️ para negocios que venden en línea y en tienda física
-</p>

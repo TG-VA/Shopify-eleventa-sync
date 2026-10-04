@@ -20,9 +20,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copiar archivo de proyecto e instalar dependencias
 COPY pyproject.toml README.md ./
+<<<<<<< HEAD
 COPY agent agent/
 COPY middleware middleware/
 COPY shared shared/
+=======
+>>>>>>> origin/main
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir --prefix=/install .
 
