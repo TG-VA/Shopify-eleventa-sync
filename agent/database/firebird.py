@@ -111,7 +111,7 @@ class FirebirdClient:
         Obtiene el inventario actual de un producto por su SKU (Código).
         """
         query = """
-            SELECT EXISTENCIA
+            SELECT COALESCE(DINVENTARIO, 0)
             FROM PRODUCTOS
             WHERE CODIGO = ?
         """
@@ -119,7 +119,7 @@ class FirebirdClient:
             cursor = conn.cursor()
             cursor.execute(query, (sku,))
             row = cursor.fetchone()
-            if row:
+            if row and row[0] is not None:
                 return float(row[0])
             return None
 
@@ -148,7 +148,7 @@ class FirebirdClient:
         """
         query = """
             UPDATE PRODUCTOS
-            SET EXISTENCIA = ?
+            SET DINVENTARIO = ?
             WHERE CODIGO = ?
         """
 
@@ -226,20 +226,20 @@ class FirebirdClient:
 
         # Normaliza el cursor a datetime naive: nunca se envía 'T' a Firebird.
         cursor_value = to_firebird_datetime(last_check_timestamp)
-        logger.debug("Buscando ventas con FECHA_HORA >= %s", cursor_value)
+        logger.debug("Buscando ventas con PAGADO_EN >= %s", cursor_value)
 
-        # Query principal sobre VENTATICKETS y VENTATICKETS_ARTICULOS
+        # Query principal sobre VENTATICKETS_ARTICULOS y VENTATICKETS
         query = """
             SELECT 
-                VT.ID_TICKET AS TICKET_ID,
-                COALESCE(VTA.CODIGO, P.CODIGO) AS CODIGO,
-                COALESCE(VTA.CANTIDAD, 1) AS CANTIDAD,
-                VT.FECHA_HORA AS FECHA_HORA
-            FROM VENTATICKETS VT
-            LEFT JOIN VENTATICKETS_ARTICULOS VTA ON VTA.ID_TICKET = VT.ID_TICKET
-            LEFT JOIN PRODUCTOS P ON P.ID = VTA.ID_PRODUCTO OR P.CODIGO = VTA.CODIGO
-            WHERE VT.FECHA_HORA >= ?
-            ORDER BY VT.FECHA_HORA ASC
+                VTA.TICKET_ID,
+                VTA.PRODUCTO_CODIGO,
+                COALESCE(VTA.CANTIDAD, 1),
+                VTA.PAGADO_EN
+            FROM VENTATICKETS_ARTICULOS VTA
+            JOIN VENTATICKETS VT ON VT.ID = VTA.TICKET_ID
+            WHERE (VT.ESTA_CANCELADO IS NULL OR VT.ESTA_CANCELADO = 'f' OR VT.ESTA_CANCELADO = 0)
+              AND VTA.PAGADO_EN >= ?
+            ORDER BY VTA.PAGADO_EN ASC
         """
         
         try:
@@ -257,19 +257,19 @@ class FirebirdClient:
                             'timestamp': format_firebird_timestamp(row[3]),
                         })
         except Exception:
-            logger.exception("Error al obtener ventas recientes")
-            # Intentar fallback con HISTORIAL_INVENTARIO si las tablas principales no existen
+            logger.exception("Error al obtener ventas recientes de VENTATICKETS")
+            # Fallback con HISTORIAL_INVENTARIO si aplicara
             try:
                 fallback_query = """
                     SELECT 
-                        HI.ID AS MOVIMIENTO_ID,
-                        HI.CODIGO,
-                        HI.CANTIDAD,
-                        HI.FECHA
+                        HI.ID,
+                        HI.CODIGO_PRODUCTO,
+                        ABS(HI.CANTIDAD),
+                        HI.CUANDO_FUE
                     FROM HISTORIAL_INVENTARIO HI
-                    WHERE HI.FECHA >= ?
-                    AND HI.CANTIDAD < 0
-                    ORDER BY HI.FECHA ASC
+                    WHERE HI.CUANDO_FUE >= ?
+                      AND HI.CANTIDAD < 0
+                    ORDER BY HI.CUANDO_FUE ASC
                 """
                 with self.get_connection() as conn:
                     cursor = conn.cursor()
@@ -285,7 +285,7 @@ class FirebirdClient:
                                 'timestamp': format_firebird_timestamp(row[3]),
                             })
             except Exception:
-                logger.exception("Error en fallback de ventas")
+                logger.exception("Error en fallback de HISTORIAL_INVENTARIO")
         
         logger.debug("Ventas recientes encontradas: %d", len(sales))
         return sales
