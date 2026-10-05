@@ -6,8 +6,40 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Generator, Any
 
-# firebird-driver >= 2.0 expone el paquete `firebird`; el alias `fdb` de 1.x ya no existe.
-from firebird.driver import Connection, connect as fb_connect
+# Soporte dual: `fdb` para Firebird 2.0/2.5 (Eleventa) y `firebird.driver` para Firebird 3.0+
+try:
+    import fdb
+    HAS_FDB = True
+except ImportError:
+    HAS_FDB = False
+
+try:
+    from firebird.driver import connect as fb_driver_connect
+    HAS_FIREBIRD_DRIVER = True
+except ImportError:
+    HAS_FIREBIRD_DRIVER = False
+
+
+def _connect_db(database: str, user: str, password: str, charset: str = "WIN1252") -> Any:
+    """Conecta a Firebird utilizando fdb (2.x/2.5) o firebird-driver (3.x+) según disponibilidad."""
+    if HAS_FDB:
+        return fdb.connect(
+            dsn=database,
+            user=user,
+            password=password,
+            charset=charset,
+        )
+    if HAS_FIREBIRD_DRIVER:
+        return fb_driver_connect(
+            database=database,
+            user=user,
+            password=password,
+            charset=charset,
+        )
+    raise RuntimeError("No se encontró ningún conector Firebird disponible (fdb o firebird-driver).")
+
+
+fb_connect = _connect_db
 
 from agent.config import settings
 from agent.timestamps import format_firebird_timestamp, to_firebird_datetime
@@ -52,7 +84,7 @@ class FirebirdClient:
         self.password = password
 
     @contextmanager
-    def get_connection(self) -> Generator[Connection, None, None]:
+    def get_connection(self) -> Generator[Any, None, None]:
         """
         Context manager para obtener una conexión a la base de datos.
         Asegura que la conexión se cierre al terminar.
