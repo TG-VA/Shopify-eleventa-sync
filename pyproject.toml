@@ -51,6 +51,4 @@ warn_unused_configs = true
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
-[tool.hatch.build.targets.wheel]
-packages = ["middleware", "shared"]
 

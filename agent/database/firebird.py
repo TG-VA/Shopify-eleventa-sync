@@ -61,7 +61,7 @@ class FirebirdClient:
         try:
             # charset='UTF8' o 'WIN1252' dependiendo de la configuración de Eleventa
             conn = fb_connect(
-                dsn=self.db_path,
+                database=self.db_path,
                 user=self.user,
                 password=self.password,
                 charset="WIN1252",
